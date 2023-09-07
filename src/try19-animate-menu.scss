@@ -1,0 +1,14 @@
+.hamb.aaa svg {
+    --tw-rotate: 45deg;
+    transform: rotate(45deg);
+}
+.hamb.aaa svg .lineTop {
+    stroke-dashoffset: -64px;
+}
+.hamb.aaa svg .lineMiddle {
+    --tw-rotate: 90deg;
+    transform: rotate(90deg);
+}
+.hamb.aaa svg .lineBottom {
+    stroke-dashoffset: -64px;
+}

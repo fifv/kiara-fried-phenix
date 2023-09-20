@@ -1,7 +1,7 @@
 import clsx from 'clsx'
-import { LazyExoticComponent, Suspense, lazy, useEffect, useState } from 'react'
+import { LazyExoticComponent, Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocalStorage } from 'usehooks-ts'
-
+import { ErrorBoundary, FallbackProps } from "react-error-boundary"
 // import App from './test-devtool'
 // import App from './components/Slider'
 // import App from './try-trpc/try-trpc-client'
@@ -50,6 +50,11 @@ const appTitlesAndComponents: [string, LazyExoticComponent<() => JSX.Element>][]
     ['17-virtualize-tanstack', lazy(() => import('./try17-virtualize-tanstack')),],
     ['18-echarts', lazy(() => import('./try18-echarts')),],
     ['19-animate-menu', lazy(() => import('./try19-animate-menu')),],
+    ['20-use-gesture', lazy(() => import('./try20-use-gesture')),],
+    ['21-react-three-fiber', lazy(() => import('./try21-react-three-fiber')),],
+    ['22-jotai-family', lazy(() => import('./try22-jotai-family')),],
+    ['23-jotai-query', lazy(() => import('./try23-jotai-query')),],
+    ['24-jotai-more', lazy(() => import('./try24-jotai-more')),],
     ['Slider', lazy(() => import('./components/Slider')),],
     ['vanilla-01-css-absoluteincss', lazy(() => import('./try-vanilla/try01-css-absoluteincss')),],
     ['vanilla-02-css-3dtransform', lazy(() => import('./try-vanilla/try02-css-3dtransform')),],
@@ -57,59 +62,88 @@ const appTitlesAndComponents: [string, LazyExoticComponent<() => JSX.Element>][]
 // const Apps = appTitlesAndComponents.map((appPath) =>
 //     lazy(() => import(`./try${appPath}.tsx`))
 // )
+
+function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
+    // Call resetErrorBoundary() to reset the error boundary and retry the render.
+    // console.log((error as Error).stack?.split('\n'))
+    return (
+        <div className="relative p-4 m-4 w-2/3  bg-red-500 flex flex-col justify-center rounded items-center ">
+            <div className=" pb-4 font-bold text-lg">ERROR</div>
+            <button onClick={ resetErrorBoundary } className="absolute top-2 right-4 ">RETRY</button>
+            <div className="p-4 font-mono bg-black text-red-500 rounded #whitespace-nowrap" >{
+                (error as Error).stack
+                    ?.split('\n')
+                    .map((item) => (<div>{ item }</div>))
+            }</div>
+        </div>
+    )
+}
 export default function App() {
+    const refNavigationPanel = useRef<HTMLDivElement>(null)
+
     const [currentAppIndex, setCurrentAppIndex] = useLocalStorage('currentAppIndex', 0)
     const [isShowPanel, setIsShowPanel] = useLocalStorage('isShowPanel', true)
 
-    const CurrentApp = appTitlesAndComponents[currentAppIndex][1]
+    const CurrentApp =
+        appTitlesAndComponents[currentAppIndex]?.[1]
+        ?? (() => <div className="text-red-400 text-3xl">!! No such component !!</div>)
+    const Panel = <>
+        <div
+            onClick={ () => {
+                setIsShowPanel((x) => (!x))
+            } }
+            className={ clsx(
+                '',
+                /* if no top-0, fixed elements' position will be unexpected */
+                'z-[99999] fixed top-1 right-1 h-8 w-8 flex justify-center items-center',
+                'rounded',
+                'hover:bg-white/10 active:bg-white/5',
+                'select-none font-bold font-mono',
+            ) }
+        >{ isShowPanel ? '>' : '<' }</div>
+        {
+            isShowPanel &&
+            <div className={ clsx(
+                'navigationPanel',
+                'z-[99999] mr-1 p-1  fixed right-0 top-10 max-h-[calc(100vh_-_52px)] overflow-y-auto',
+                'outline outline-white/30 outline-1 bg-black/30 rounded',
+                'select-none font-bold font-mono',
+            ) } ref={ refNavigationPanel }>
+                {
+                    appTitlesAndComponents.map((appTitleAndComponent, i) =>
+                        <div
+                            key={ i }
+                            className={ clsx(
+                                'rounded p-1',
+                                'hover:bg-white/10 active:bg-white/5',
+                                currentAppIndex === i && 'outline outline-lime-300 text-lime-300'
+                            ) }
+                            onPointerDown={ () => {
+                                setCurrentAppIndex(i)
+                            } }
+                            onPointerEnter={ (e) => {
+                                if (e.buttons === 1) {
+                                    setCurrentAppIndex(i)
+                                }
+                            } }
+                        >{ appTitleAndComponent[0] }</div>
+                    )
+                }
+            </div>
+        }
 
+    </>
+
+    useLayoutEffect(() => {
+        refNavigationPanel.current?.scrollTo({ top: 32 * currentAppIndex - 100 })
+    }, [isShowPanel])
     return (
         <>
-            <div
-                onClick={ () => {
-                    setIsShowPanel((x) => (!x))
-                } }
-                className={ clsx(
-                    '',
-                    'z-[99999] m-1 fixed right-0 h-8 w-8 flex justify-center items-center',
-                    'rounded',
-                    'hover:bg-white/10 active:bg-white/5',
-                    'select-none font-bold font-mono',
-                ) }
-            >{ isShowPanel ? '>' : '<' }</div>
-            {
-                isShowPanel &&
-                <div className={ clsx(
-                    'navigationPanel',
-                    'z-[99999] m-1 p-1  fixed right-0 top-10 max-h-[calc(100vh_-_52px)] overflow-y-auto',
-                    'outline outline-white/30 outline-1 bg-black/30 rounded',
-                    'select-none font-bold font-mono',
-                ) }>
-                    {
-                        appTitlesAndComponents.map((appTitleAndComponent, i) =>
-                            <div
-                                key={ i }
-                                className={ clsx(
-                                    'rounded p-1',
-                                    'hover:bg-white/10 active:bg-white/5',
-                                    currentAppIndex === i && 'outline outline-lime-300 text-lime-300'
-                                ) }
-                                onPointerDown={ () => {
-                                    setCurrentAppIndex(i)
-                                } }
-                                onPointerEnter={ (e) => {
-                                    if (e.buttons === 1) {
-                                        setCurrentAppIndex(i)
-                                    }
-                                } }
-                            >{ appTitleAndComponent[0] }</div>
-                        )
-                    }
-                </div>
-            }
-
+            { Panel }
             {/* <Suspense fallback={ <div>loading...</div> }> */ }
-            <CurrentApp></CurrentApp>
+            <ErrorBoundary FallbackComponent={ ErrorFallback } resetKeys={ [currentAppIndex] }>
+                <CurrentApp></CurrentApp>
+            </ErrorBoundary>
             {/* </Suspense> */ }
         </>
     )

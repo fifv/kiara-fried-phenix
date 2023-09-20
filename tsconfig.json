@@ -21,6 +21,7 @@
 		"jsx": "react-jsx",
 		"sourceMap": true,
         "allowImportingTsExtensions": true,
+        "noUncheckedIndexedAccess": true,
 	},
 	"include": [
 		"src"

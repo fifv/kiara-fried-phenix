@@ -20,7 +20,6 @@ export const useIsRestoring = () => React.useContext(IsRestoringContext)
 export const IsRestoringProvider = IsRestoringContext.Provider
 
 export const isRestoringAtom = atom(true)
-
 export const PersistQueryClientProvider = ({
     client,
     children,

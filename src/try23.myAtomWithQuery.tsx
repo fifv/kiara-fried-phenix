@@ -1,6 +1,6 @@
 import { DefaultError, QueryClient, QueryKey, QueryObserver, QueryObserverOptions, QueryObserverResult, notifyManager } from "@tanstack/query-core"
 import { Getter, atom, getDefaultStore, } from "jotai"
-import { isRestoringAtom } from "./try23.PersistQueryClientProvider"
+// import { isRestoringAtom } from "./try23.PersistQueryClientProvider"
 const defaultStore = getDefaultStore()
 /**
  * idk if atom can know itself is used in a component, and know when the component is unmounted
@@ -45,6 +45,8 @@ const defaultStore = getDefaultStore()
  * 
  */
 
+
+
 export function atomWithQuery<
     TQueryFnData = unknown,
     TError = DefaultError,
@@ -64,6 +66,15 @@ export function atomWithQuery<
      * I don't understand, but here the defaultStore.get won't break app even it use another store
      */
     // let hack: (() => void) | undefined = undefined
+    // const observerAtom = atom(
+    //     (get) => {
+    //         const observer = new QueryObserver<TQueryFnData, TError, TData, TQueryData, TQueryKey>(
+    //             client,
+    //             client.defaultQueryOptions(getOptions(get)),
+    //         )
+    //         return observer
+    //     }
+    // )
     const observer = new QueryObserver<TQueryFnData, TError, TData, TQueryData, TQueryKey>(
         client,
         client.defaultQueryOptions(getOptions(defaultStore.get)),
@@ -81,7 +92,7 @@ export function atomWithQuery<
         (get) => {
             get(refreshAtom)
 
-            const isRestoring = get(isRestoringAtom)
+            // const isRestoring = get(isRestoringAtom)
             // if (!hack) {
             //     hack = observer.subscribe(() => {
             //         defaultStore.set(refreshAtom, x => x + 1)
@@ -92,13 +103,13 @@ export function atomWithQuery<
             //     console.log('noooooo')
             // }
             // console.log('resultAtom get');
-            const defaultedQueryOptions = client.defaultQueryOptions(
-                getOptions(get)
-            )
-            defaultedQueryOptions._optimisticResults =
-                isRestoring
-                    ? 'isRestoring'
-                    : 'optimistic'
+            // const defaultedQueryOptions = client.defaultQueryOptions(
+            //     getOptions(get)
+            // )
+            // defaultedQueryOptions._optimisticResults =
+            //     isRestoring
+            //         ? 'isRestoring'
+            //         : 'optimistic'
 
             // console.timeEnd('client.defaultQueryOptions')
 
@@ -108,11 +119,15 @@ export function atomWithQuery<
              * the result from observer.getOptimisticResult will be...weird
              */
             observer.setOptions(
-                defaultedQueryOptions,
+                getOptions(get),
                 { listeners: false }
             )
             // console.timeEnd('observer.setOptions')
-
+            /**
+             * observer.getOptimisticResult 確實是會build新的Query,獲取新的option的result
+             * 但是! 他不會在新Query.listeners裡加上這個Observer,所以新query處於inactive狀態下根本不會開始fetch
+             * 所以要observer.setOptions, 可以正確把Observer綁定到新的Query上去
+             */
             // console.time('observer.getOptimisticResult')
             // const result =
             //     observer.getOptimisticResult(
@@ -168,6 +183,18 @@ export function atomWithQuery<
             // hack = undefined
         }
     }
+    // export const isRestoringAtomBase = atom(true)
+    // export const isRestoringAtom = atom(
+    //     (get) => get(isRestoringAtomBase),
+    //     (get, set, newValue: boolean) => {
+    //         set(isRestoringAtomBase, newValue)
+    //         const unsubscribe = observer.subscribe((result) => {
+    //             // notifyManager.batchCalls(() => {
+    //             // })
+    //             set(refresh)
+    //         })
+    //     }
+    // )
     /**
      * not works...????
      */

@@ -4,7 +4,7 @@ import { atomFamily, selectAtom, useHydrateAtoms } from 'jotai/utils'
 import { Provider, atom, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
 import { DevTools as JotaiDevTools } from 'jotai-devtools'
-// import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import clsx from "clsx"
 
@@ -21,7 +21,7 @@ const myStore = createStore()
  */
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
 import { atomWithQuery } from "./try23.myAtomWithQuery"
-import { PersistQueryClientProvider } from "./try23.PersistQueryClientProvider"
+// import { PersistQueryClientProvider } from "./try23.PersistQueryClientProvider"
 const queryClient = new QueryClient()
 const persister = createSyncStoragePersister({
     storage: window.localStorage,
@@ -122,7 +122,7 @@ const queryResultAtom = atomWithQuery((get) => {
                     } else {
                         reject()
                     }
-                }, 2000)
+                }, 500)
             })
         },
     }

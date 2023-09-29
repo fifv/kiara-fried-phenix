@@ -34,8 +34,8 @@ export function useDeltaIndicator(props?: {
      */
     const showDeltaIndicator = useCallback(
         function showDeltaIndicator(newDelta: number, willPersistShowDeltaIndicator?: boolean) {
-            console.log("🚀 ~ file: Slider.tsx:37 ~ showDeltaIndicator ~ newDelta:", newDelta)
-            
+            // console.log("🚀 ~ file: Slider.tsx:37 ~ showDeltaIndicator ~ newDelta:", newDelta)
+
             if (willPersistShowDeltaIndicator != null) {
                 refIsPersistShowDeltaIndicator.current = willPersistShowDeltaIndicator
             } else {
@@ -199,8 +199,20 @@ export function DeltaIndicator({ /* isVisiable, */ /* children, */isForceShow, /
  * 
  */
 /**
+ * 想象一個場景,video正在play,進度條動的飛快,此時slide...會怎麼樣呢?
+ * mouse指哪打哪,不用考慮這個問題
+ * 但是touch不一樣了,
+ */
+/**
+ * slide -> onValueChange -> setValue(newValue) -> `value` passed to Slider
+ * what if I slide fast and meachine is too slow too handle all the setState?
+ * Some setState just got discarded.
+ * Then, the slider progressed less than expected, it will lag behind finger
+ */
+/**
  * 默認沒有 position,height,width, 請用className自己加
  * You should check valueDelta!==0 to fire event
+ * 
  */
 export function Slider({ isShowSlider = true,
     isVertical,
@@ -255,7 +267,12 @@ export function Slider({ isShowSlider = true,
     // const refIsPointerDown = useRef(false)
     const refPrevTouch = useRef<Touch | null>(null)
     const refTouchIdentifier = useRef<number | null>(null)
+    const refTouchPointerId = useRef<number | null>(null)
     const refActionArea = useRef<HTMLDivElement>(null)
+    const refFirstPointerTouchEvent = useRef<React.PointerEvent | null>(null)
+    const refFirstValueWhenPointerTouchStart = useRef<number | null>(null)
+    const refPrevPointerTouchEvent = useRef<React.PointerEvent | null>(null)
+    const refIsAbleTouchSlide = useRef(true)
 
     // const [value, setValue] = useState(0.5) /* 0~1 */
     const [valueHover, setValueHover] = useState(value) /* 0~1 */
@@ -283,100 +300,98 @@ export function Slider({ isShowSlider = true,
          * e.buttons === 0B00000001 || e.buttons === 0B00000000
          * e.buttons & ~0B00000001
          */
+        const rect = e.currentTarget.getBoundingClientRect()
 
         if (e.pointerType === 'mouse') {
             e.stopPropagation()
-            // if (!isAbleTouch) {
-            const rect = e.currentTarget.getClientRects().item(0)
-            if (rect) {
+            /**
+             * 這才是解法,按下其他鍵要取消capture狀態
+             * 如果拖動的時候按右鍵,好像不會觸發pointerdown,而是move?
+             */
+            if (e.buttons > 1) {
+                e.currentTarget.releasePointerCapture(e.pointerId)
+                // refIsPointerDown.current = false
+                setIsPointerDown(false)
+                onPointerUp?.()
+            }
+            /**
+             * 如果按著其他鍵e.buttons > 1,如果能讓hover能有響應比較好,所以下面的不放else裡面
+             */
+            const newValue = clamp(
+                isVertical
+                    ? 1 - ((e.clientY - rect.top) / rect.height) /* Y越小,value越大,反的 */
+                    : (e.clientX - rect.left) / rect.width,
+                0, 1
+            )
+            switch (e.type) {
                 /**
-                 * 這才是解法,按下其他鍵要取消capture狀態
-                 * 如果拖動的時候按右鍵,好像不會觸發pointerdown,而是move?
+                 * 不加break,down能changeValue
+                 * refIsPointerDown.current改用了ref,本來是state,但是state改了之後本次function還是沒有生效的,用ref就正常了
                  */
-                if (e.buttons > 1) {
-                    e.currentTarget.releasePointerCapture(e.pointerId)
+                case 'pointerdown': {
+                    /**
+                     * 不能讓其他鍵生效
+                     */
+                    if (e.buttons === 1) {
+                        // refIsPointerDown.current = true
+                        setIsPointerDown(true)
+                        onPointerDown?.()
+
+                        /**
+                         * 好東西啊,超出瀏覽器都能正常觸發event
+                         */
+                        e.currentTarget.setPointerCapture(e.pointerId)
+                        handleValueChange(newValue, newValue - value)
+                    }
+                    break
+                }
+
+                /**
+                 * \就剩pointerenter和pointermove了
+                 * 其實我根本沒有監聽enter
+                 * 
+                 * move分為按著的move和不按的move
+                 */
+                case 'pointermove': {
+                    setValueHover(newValue)
+                    setIsHovered(true)
+                    /**
+                     * 可能會出現右鍵點滑條,然後點開,觸發pointerleave然後跳進度
+                    */
+                    if (e.buttons === 1 && isPointerDown) {
+                        /**
+                         * why??? pointerdown will trigger a pointermove with movementX=0
+                         * and triggered...randomly? when focus on devtools then click, this will trigger, then more click not trigger
+                         */
+                        // console.log('pointermove?????', e.movementX)
+                        // setValue(newValue)
+                        handleValueChange(newValue, newValue - value)
+                    }
+                    break
+                }
+                case 'pointerup': {
                     // refIsPointerDown.current = false
                     setIsPointerDown(false)
                     onPointerUp?.()
-                }
-                /**
-                 * 如果按著其他鍵e.buttons > 1,如果能讓hover能有響應比較好,所以下面的不放else裡面
-                 */
-                const newValue = clamp(
-                    isVertical
-                        ? 1 - ((e.clientY - rect.top) / rect.height) /* Y越小,value越大,反的 */
-                        : (e.clientX - rect.left) / rect.width,
-                    0, 1
-                )
-                switch (e.type) {
+
+                    // if (e.buttons === 1) {
+                    //     handleValueChange(newValue, 0)
+                    // } else {
+                    //     handleValueChange(value, 0)
+                    // }
                     /**
-                     * \就剩pointerenter和pointermove了
-                     * 其實我根本沒有監聽enter
-                     * 
-                     * move分為按著的move和不按的move
-                     */
-                    case 'pointermove': {
-                        setValueHover(newValue)
-                        setIsHovered(true)
-                        /**
-                         * 可能會出現右鍵點滑條,然後點開,觸發pointerleave然後跳進度
-                        */
-                        if (e.buttons === 1 && isPointerDown) {
-                            /**
-                             * why??? pointerdown will trigger a pointermove with movementX=0
-                             */
-                            // console.log('pointermove?????',e.movementX);
-                            // setValue(newValue)
-                            handleValueChange(newValue, newValue - value)
-                        }
-                        break
-                    }
-                    case 'pointerleave': {
-                        // setValueHover(0)
-                        setIsHovered(false)
-                        break
-                    }
-                    case 'pointerup': {
-                        // refIsPointerDown.current = false
-                        setIsPointerDown(false)
-                        onPointerUp?.()
-
-                        // if (e.buttons === 1) {
-                        //     handleValueChange(newValue, 0)
-                        // } else {
-                        //     handleValueChange(value, 0)
-                        // }
-                        /**
-                         * 這個好像不加也行,doc裡說了pointerup會自動release
-                        */
-                        e.currentTarget.releasePointerCapture(e.pointerId)
-                        break
-                    }
-                    /**
-                     * 不加break,down能changeValue
-                     * refIsPointerDown.current改用了ref,本來是state,但是state改了之後本次function還是沒有生效的,用ref就正常了
-                     */
-                    case 'pointerdown': {
-                        /**
-                         * 不能讓其他鍵生效
-                         */
-                        if (e.buttons === 1) {
-                            // refIsPointerDown.current = true
-                            setIsPointerDown(true)
-                            onPointerDown?.()
-
-                            /**
-                             * 好東西啊,超出瀏覽器都能正常觸發event
-                             */
-                            e.currentTarget.setPointerCapture(e.pointerId)
-                            handleValueChange(newValue, newValue - value)
-                        }
-                        break
-                    }
-
+                     * 這個好像不加也行,doc裡說了pointerup會自動release
+                    */
+                    e.currentTarget.releasePointerCapture(e.pointerId)
+                    break
                 }
+                case 'pointerleave': {
+                    // setValueHover(0)
+                    setIsHovered(false)
+                    break
+                }
+
             }
-            // }
 
             /**
              * Archive: e.type === mousemove
@@ -385,11 +400,83 @@ export function Slider({ isShowSlider = true,
              * 滑動不會觸發,但是tap會觸發...???
              */
 
+        } else if (e.pointerType === 'touch') {
+            switch (e.type) {
+                case 'pointerdown': {
+                    if (refTouchPointerId.current === null) {
+                        refTouchPointerId.current = e.pointerId
+                        refFirstPointerTouchEvent.current = e
+                        refPrevPointerTouchEvent.current = e
+                        refFirstValueWhenPointerTouchStart.current = value
+                        e.currentTarget.setPointerCapture(e.pointerId)
+                        setIsPointerDown(true)
+                        onPointerDown?.()
+                    }
+
+                    break
+                }
+                case 'pointermove': {
+                    /**
+                     * seems that e.movementY is quite imprecise, it's an integer
+                     * make sure use `!== null` to check number, instead of !!
+                     */
+                    if (e.pointerId === refTouchPointerId.current && refPrevPointerTouchEvent.current) {
+                        const movementX = e.clientX - refPrevPointerTouchEvent.current?.clientX
+                        const movementY = e.clientY - refPrevPointerTouchEvent.current?.clientY
+                        // console.log(e.clientX)
+                        if (isVertical) {
+                            /**
+                             * 減少垂直滑動的誤觸
+                             */
+                            // if (Math.abs(movementX) < Math.abs(movementY)) {
+                            const newValue = clamp(
+                                value + (-movementY / rect.height), /* clientY減少說明向上移動,實際value增加,兩者相反 */
+                                0, 1
+                            )
+                            handleValueChange(newValue, newValue - value)
+                            // }
+                        } else {
+                            // if (Math.abs(movementX) > Math.abs(movementY)) {
+
+                            const newValue = clamp(
+                                // refFirstValueWhenPointerTouchStart.current + ((e.clientX - refFirstPointerTouchEvent.current.clientX) / rect.width) * 1,
+                                value + (movementX / rect.width),
+                                0, 1
+                            )
+                            handleValueChange(newValue, newValue - value)
+                            // }
+                        }
+                        refPrevPointerTouchEvent.current = e
+                    }
+                    break
+                }
+                case 'pointerup': {
+                    if (e.pointerId === refTouchPointerId.current) {
+
+                        e.currentTarget.releasePointerCapture(e.pointerId)
+                        refTouchPointerId.current = null
+                        setIsPointerDown(false)
+                        onPointerUp?.()
+                    }
+                    break
+                }
+
+
+                default:
+                    break
+            }
         }
     }
+
+
+
+    
     /**
      * use e.targetTouches to ignore touches started at other place
      * so each Slider won't infect each other
+     */
+    /**
+     * @deprecated use hanldePointerEvent instead
      */
     function handleTouchStart(e: React.TouchEvent<HTMLDivElement>) {
         /**
@@ -411,6 +498,9 @@ export function Slider({ isShowSlider = true,
         // touch.type = e.type
         // setInfoTouch(touch)
     }
+    /**
+     * @deprecated use hanldePointerEvent instead
+     */
     function handleTouchMove(e: React.TouchEvent<HTMLDivElement>) {
         /**
          * FIX\ME: multiple random touch causes large jump of delta
@@ -434,7 +524,7 @@ export function Slider({ isShowSlider = true,
              * see MDN, touches list will be randomly order, so make sure only track the same finger
              */
             // console.log('refPrevTouch.current.identifier', refPrevTouch.current?.identifier, 'touch?.identifier', touch?.identifier)
-            if (touch && refPrevTouch.current?.identifier === touch.identifier) {
+            if (touch && refPrevTouch.current) {
                 const deltaY = touch.clientY - refPrevTouch.current.clientY
                 const deltaX = touch.clientX - refPrevTouch.current.clientX
                 // showMessage('touchmove'+deltaX, false)
@@ -473,9 +563,12 @@ export function Slider({ isShowSlider = true,
             }
         }
     }
-/**
- * here the e.targetTouches do NOT contain the one ended
- */
+    /**
+     * here the e.targetTouches do NOT contain the one ended
+     */
+    /**
+     * @deprecated use hanldePointerEvent instead
+     */
     function handleTouchEnd(e: React.TouchEvent<HTMLDivElement>) {
         // console.log('.touches',e.touches);
         let isCurrentTouchEnded = true
@@ -490,24 +583,18 @@ export function Slider({ isShowSlider = true,
         }
         // if (e.targetTouches.length === 0) {
         // }
-        if (isCurrentTouchEnded) {            
+        if (isCurrentTouchEnded) {
             refTouchIdentifier.current = null
             // handleValueChange(value, 0)
             setIsPointerDown(false)
             onPointerUp?.()
         }
         /**
+         * Archive: ?
          * touchEnd的時候,touches已經為空了
          * 然後老問題,Touch不能spread
          */
-        // setInfoTouch(
-        // 	(newInfoTouch) => {
-        // 		if (newInfoTouch) {
-        // 			newInfoTouch.type = e.type
-        // 		}
-        // 		return newInfoTouch
-        // 	}
-        // )
+
     }
 
     useEffect(() => {
@@ -522,9 +609,7 @@ export function Slider({ isShowSlider = true,
             onWheel && actionArea?.removeEventListener('wheel', handelWheel)
         }
     }, [onWheel])
-    useEffect(() => {
 
-    }, [])
     const _____Components_____ = 0
     return (
         <>
@@ -541,9 +626,9 @@ export function Slider({ isShowSlider = true,
                 } }
                 // onWheel={ onWheel }
 
-                onTouchStart={ handleTouchStart }
-                onTouchMove={ handleTouchMove }
-                onTouchEnd={ handleTouchEnd }
+                // onTouchStart={ handleTouchStart }
+                // onTouchMove={ handleTouchMove }
+                // onTouchEnd={ handleTouchEnd }
 
 
                 { ...(!isDisableMouse && {
@@ -696,6 +781,14 @@ export default function Test() {
             document.removeEventListener('keydown', handleKeydown)
         }
     }, [showDeltaIndicator])
+    // useEffect(() => {
+    //     const it = setInterval(function () {
+    //         setValue1(x => (x * 100 + 1) % 100 / 100)
+    //     }, 20)
+    //     return () => {
+    //         clearInterval(it)
+    //     }
+    // }, [])
 
     /**
      *  FIX\ME: delta不準確
@@ -726,11 +819,11 @@ export default function Test() {
                 } }
 
                 onValueChange={ (newValue, isPointerDown: boolean, newValueDelta: number) => {
-                    // setValue1((s) => s + newValueDelta)
+                    setValue1((s) => s + newValueDelta)
                     // setValue1(value1 + newValueDelta)
-                    setValue1(newValue)
-                    showDeltaIndicator(newValueDelta, isPointerDown)
-                    console.log('isPointerDown', isPointerDown)
+                    // setValue1(newValue)
+                    showDeltaIndicator(newValueDelta, true)
+                    // console.log('isPointerDown', isPointerDown)
                     // setIsSliderPointerDown(isPointerDown)
                     // if (isSliderPointerDown) {
                     //     setValueDelta((s) => s + newValueDelta)
@@ -924,32 +1017,32 @@ function ChangeVisibleChar({ char }: { char: string }) {
     const refAnimation = useRef<Animation | undefined>(undefined)
     const refElem = useRef<HTMLSpanElement>(null)
     useEffect(() => {
-        if (char !== refPrevChar.current) {
-            // if (refAnimation.current) {
-            //     refAnimation.current?.cancel()
-            //     refAnimation.current?.play()
+        // if (char !== refPrevChar.current) {
+        //     if (refAnimation.current) {
+        //         refAnimation.current?.cancel()
+        //         refAnimation.current?.play()
 
-            // }else {
+        //     } else {
 
-            // refAnimation.current = refElem.current?.animate(
-            //     [
-            //         {
-            //             backgroundColor: 'DarkGoldenRod'
-            //         },
-            //         {
-            //             backgroundColor: 'transparent'
-            //         },
-            //     ],
-            //     {
-            //         fill: "both",
-            //         duration: 300,
+        //         refAnimation.current = refElem.current?.animate(
+        //             [
+        //                 {
+        //                     backgroundColor: 'DarkGoldenRod'
+        //                 },
+        //                 {
+        //                     backgroundColor: 'transparent'
+        //                 },
+        //             ],
+        //             {
+        //                 fill: "both",
+        //                 duration: 300,
 
-            //     }
-            // )
-            // }
-        }
+        //             }
+        //         )
+        //     }
+        // }
         refPrevChar.current = char
-    }, [])
+    }, [char])
     return (
         <span ref={ refElem }>{ char }</span>
     )

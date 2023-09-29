@@ -140,8 +140,8 @@ function PullRelease() {
         api.start({
             // x: down ? movement[0] : 0,
             // y: down ? movement[1] : 0,
-            x: offset[0],
-            y: offset[1],
+            // x: offset[0],
+            // y: offset[1],
 
             // x: mx,
             // y: my,
@@ -149,12 +149,12 @@ function PullRelease() {
             // immediate: true,
         })
     }, {
-        // axis: "x",
+        axis: "x",
     })
     // Bind it to a component
     return <>
         <animated.div className={ clsx(
-            'bg-green-300 w-24 h-24 rounded select-none touch-none',
+            'bg-green-300 w-60 h-60 rounded select-none touch-none',
         ) } { ...bind() } style={ { x, y } } />
         <div className={ clsx(
             'flex flex-col flex-wrap max-h-[500px] font-mono font-bold',

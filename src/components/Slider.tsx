@@ -5,6 +5,7 @@
 import clsx from "clsx"
 import { clamp } from "lodash-es"
 import { Fragment, ReactNode, RefObject, useCallback, useEffect, useRef, useState } from "react"
+import { flushSync } from "react-dom"
 import { FiChevronsLeft, FiChevronsRight } from 'react-icons/fi'
 import { match, } from 'ts-pattern'
 // import { showMessage } from "../utils/utils"
@@ -208,7 +209,40 @@ export function DeltaIndicator({ /* isVisiable, */ /* children, */isForceShow, /
  * what if I slide fast and meachine is too slow too handle all the setState?
  * Some setState just got discarded.
  * Then, the slider progressed less than expected, it will lag behind finger
+ * 
+ * Imagine: 
+ * fast
+ *   setValue(value + newValueDelta)
+ *   setValue(value + newValueDelta)
+ *   setValue(value + newValueDelta)
+ * may cause the value didn't change for all three fn, so only the last one toke effect
+ * and the first two's newValueDelta lost
+ * so you should use
+ *   setValue(value => value + newValueDelta)
+ *   setValue(value => value + newValueDelta)
+ *   setValue(value => value + newValueDelta)
+ * then nothing lost, good!
+ * 
  */
+/**
+ * 時刻記住,react不一定來得及更新value,導致多次trigger event with same props
+ * 
+ */
+/**
+ * TEST:
+ * 
+ * mouse:
+ * fast slide : accurate
+ * pointerdown -> enter
+ * slide outside
+ * click other buttom during sliding
+ * 
+ * 
+ * touch:
+ * fast slide : accurate
+ * multifinger
+ */
+
 /**
  * 默認沒有 position,height,width, 請用className自己加
  * You should check valueDelta!==0 to fire event
@@ -221,11 +255,16 @@ export function Slider({ isShowSlider = true,
     children,
     isShowDebugInfo: isDebug,
     isDisableMouse = false,
+    isDisableSlide = false,
+    isLockAxis = false,
     bufferedPercentRanges,
-    onValueChange, getIndicatorContent, onWheel, onPointerDown, onPointerUp,
+    hoverIndicatorPosition,
+    isEnableHoverIndicator = false,
+    onValueChange, getHoverIndicatorContent, onWheel, onPointerDown, onPointerUp,
 }: {
     isShowSlider?: boolean
     isVertical: boolean
+    isDisableSlide?: boolean
     className?: string
     /**
      * 0~1
@@ -238,9 +277,11 @@ export function Slider({ isShowSlider = true,
      * combined with isVertical
      */
     hoverIndicatorPosition?: 'top/left' | 'bottom/right'
+    isEnableHoverIndicator?: boolean
     children?: React.ReactNode
     isShowDebugInfo?: boolean
     isDisableMouse?: boolean
+    isLockAxis?: boolean
     bufferedPercentRanges?: {
         start: number
         end: number
@@ -250,11 +291,13 @@ export function Slider({ isShowSlider = true,
     /**
      * onValueChange() only called when value change by sliding
      * It will NOT be called if the passed value changed
+     * 
+     * everything rely on old value in closure is dangerous, so use newValueDelta
      */
     onValueChange?: (newValue: number, isPointerDown: boolean, newValueDelta: number) => void
     onPointerDown?: () => void
     onPointerUp?: () => void
-    getIndicatorContent?: (value: number, delta: number) => ReactNode
+    getHoverIndicatorContent?: (valueHover: number) => ReactNode
     // onIndicatorChange?: (isShowIndicator: boolean, valueDelta: number) => void,
     onWheel?: (e: WheelEvent) => void
 }) {
@@ -267,12 +310,14 @@ export function Slider({ isShowSlider = true,
     // const refIsPointerDown = useRef(false)
     const refPrevTouch = useRef<Touch | null>(null)
     const refTouchIdentifier = useRef<number | null>(null)
-    const refTouchPointerId = useRef<number | null>(null)
+    const refPointerIdForTouch = useRef<number | null>(null)
     const refActionArea = useRef<HTMLDivElement>(null)
-    const refFirstPointerTouchEvent = useRef<React.PointerEvent | null>(null)
-    const refFirstValueWhenPointerTouchStart = useRef<number | null>(null)
+    // const refFirstPointerTouchEvent = useRef<React.PointerEvent | null>(null)
+    // const refFirstValueWhenPointerTouchStart = useRef<number | null>(null)
     const refPrevPointerTouchEvent = useRef<React.PointerEvent | null>(null)
+    const refPrevPointerMouseEvent = useRef<React.PointerEvent | null>(null)
     const refIsAbleTouchSlide = useRef(true)
+    const refIsFirstPointerTouchMove = useRef(true)
 
     // const [value, setValue] = useState(0.5) /* 0~1 */
     const [valueHover, setValueHover] = useState(value) /* 0~1 */
@@ -302,7 +347,7 @@ export function Slider({ isShowSlider = true,
          */
         const rect = e.currentTarget.getBoundingClientRect()
 
-        if (e.pointerType === 'mouse') {
+        if (e.pointerType === 'mouse' && !isDisableMouse) {
             e.stopPropagation()
             /**
              * 這才是解法,按下其他鍵要取消capture狀態
@@ -342,6 +387,7 @@ export function Slider({ isShowSlider = true,
                          */
                         e.currentTarget.setPointerCapture(e.pointerId)
                         handleValueChange(newValue, newValue - value)
+                        refPrevPointerMouseEvent.current = e
                     }
                     break
                 }
@@ -358,14 +404,20 @@ export function Slider({ isShowSlider = true,
                     /**
                      * 可能會出現右鍵點滑條,然後點開,觸發pointerleave然後跳進度
                     */
-                    if (e.buttons === 1 && isPointerDown) {
-                        /**
-                         * why??? pointerdown will trigger a pointermove with movementX=0
-                         * and triggered...randomly? when focus on devtools then click, this will trigger, then more click not trigger
-                         */
-                        // console.log('pointermove?????', e.movementX)
-                        // setValue(newValue)
-                        handleValueChange(newValue, newValue - value)
+                    if (e.buttons === 1 && isPointerDown && refPrevPointerMouseEvent.current) {
+                        const movementX = clamp(e.clientX, rect.left, rect.right) - clamp(refPrevPointerMouseEvent.current.clientX, rect.left, rect.right)
+                        const movementY = clamp(e.clientY, rect.top, rect.bottom) - clamp(refPrevPointerMouseEvent.current.clientY, rect.top, rect.bottom)
+                        if (movementX !== 0 || movementY !== 0) {
+                            if (isVertical) {
+                                const newValueDelta = -movementY / rect.height
+                                handleValueChange(newValue, newValueDelta)
+                            } else {
+                                const newValueDelta = movementX / rect.width
+                                handleValueChange(newValue, newValueDelta)
+                            }
+                            // handleValueChange(newValue, newValue - value)
+                            refPrevPointerMouseEvent.current = e
+                        }
                     }
                     break
                 }
@@ -400,14 +452,15 @@ export function Slider({ isShowSlider = true,
              * 滑動不會觸發,但是tap會觸發...???
              */
 
-        } else if (e.pointerType === 'touch') {
+        } else if (e.pointerType === 'touch' && !isDisableSlide) {
             switch (e.type) {
                 case 'pointerdown': {
-                    if (refTouchPointerId.current === null) {
-                        refTouchPointerId.current = e.pointerId
-                        refFirstPointerTouchEvent.current = e
+                    if (refPointerIdForTouch.current === null) {
+                        refPointerIdForTouch.current = e.pointerId
+                        // refFirstPointerTouchEvent.current = e
                         refPrevPointerTouchEvent.current = e
-                        refFirstValueWhenPointerTouchStart.current = value
+                        // refFirstValueWhenPointerTouchStart.current = value
+                        refIsFirstPointerTouchMove.current = true
                         e.currentTarget.setPointerCapture(e.pointerId)
                         setIsPointerDown(true)
                         onPointerDown?.()
@@ -420,44 +473,67 @@ export function Slider({ isShowSlider = true,
                      * seems that e.movementY is quite imprecise, it's an integer
                      * make sure use `!== null` to check number, instead of !!
                      */
-                    if (e.pointerId === refTouchPointerId.current && refPrevPointerTouchEvent.current) {
+                    if (e.pointerId === refPointerIdForTouch.current && refPrevPointerTouchEvent.current) {
                         const movementX = e.clientX - refPrevPointerTouchEvent.current?.clientX
                         const movementY = e.clientY - refPrevPointerTouchEvent.current?.clientY
                         // console.log(e.clientX)
-                        if (isVertical) {
-                            /**
-                             * 減少垂直滑動的誤觸
-                             */
-                            // if (Math.abs(movementX) < Math.abs(movementY)) {
-                            const newValue = clamp(
-                                value + (-movementY / rect.height), /* clientY減少說明向上移動,實際value增加,兩者相反 */
-                                0, 1
-                            )
-                            handleValueChange(newValue, newValue - value)
-                            // }
-                        } else {
-                            // if (Math.abs(movementX) > Math.abs(movementY)) {
+                        /**
+                         * sometimes pointermove fired immediately after pointerdown with `movement{X|Y} === 0`
+                         * ALWAYS remember this behavior!!! This leads to many fucking bugs
+                         */
+                        if (movementX !== 0 || movementY !== 0) {
+                            if (refIsFirstPointerTouchMove.current) {
+                                refIsAbleTouchSlide.current =
+                                    isVertical
+                                        ? Math.abs(movementX) < Math.abs(movementY)
+                                        : Math.abs(movementX) > Math.abs(movementY)
+                                refIsFirstPointerTouchMove.current = false
+                            }
+                            if (!isLockAxis || (refIsAbleTouchSlide.current)) {
+                                if (isVertical) {
+                                    /**
+                                     * 減少垂直滑動的誤觸
+                                     */
+                                    // if (Math.abs(movementX) < Math.abs(movementY)) {
+                                    const newValue = clamp(
+                                        value + (-movementY / rect.height), /* clientY減少說明向上移動,實際value增加,兩者相反 */
+                                        0, 1
+                                    )
+                                    handleValueChange(newValue, newValue - value)
+                                    // }
+                                } else {
+                                    // if (Math.abs(movementX) > Math.abs(movementY)) {
 
-                            const newValue = clamp(
-                                // refFirstValueWhenPointerTouchStart.current + ((e.clientX - refFirstPointerTouchEvent.current.clientX) / rect.width) * 1,
-                                value + (movementX / rect.width),
-                                0, 1
-                            )
-                            handleValueChange(newValue, newValue - value)
-                            // }
+                                    const newValue = clamp(
+                                        // refFirstValueWhenPointerTouchStart.current + ((e.clientX - refFirstPointerTouchEvent.current.clientX) / rect.width) * 1,
+                                        value + (movementX / rect.width),
+                                        0, 1
+                                    )
+                                    handleValueChange(newValue, newValue - value)
+                                    // }
+                                }
+                            }
                         }
                         refPrevPointerTouchEvent.current = e
                     }
                     break
                 }
+                /**
+                 * when horizontally touch three finger on K30U or MIPAD4,
+                 * pointerleave will be triggered, (3 times for all 3 pointer)
+                 */
+                case 'pointercancel':
+                case 'pointerleave':
                 case 'pointerup': {
-                    if (e.pointerId === refTouchPointerId.current) {
+                    // alert(e.type + e.pointerId)
+                    if (e.pointerId === refPointerIdForTouch.current) {
 
                         e.currentTarget.releasePointerCapture(e.pointerId)
-                        refTouchPointerId.current = null
+                        refPointerIdForTouch.current = null
                         setIsPointerDown(false)
                         onPointerUp?.()
                     }
+                    // document.body.append(e.type + e.pointerId + ' ')
                     break
                 }
 
@@ -470,7 +546,7 @@ export function Slider({ isShowSlider = true,
 
 
 
-    
+
     /**
      * use e.targetTouches to ignore touches started at other place
      * so each Slider won't infect each other
@@ -611,12 +687,51 @@ export function Slider({ isShowSlider = true,
     }, [onWheel])
 
     const _____Components_____ = 0
+    const HoverIndicator =
+        <div className={ clsx(
+            'CurrentIndicator absolute ',
+            ' px-3 py-1 w-max h-max',
+            'bg-slate-600/40 text-white/60  rounded  pointer-events-none text-xs',
+            isVertical
+                ? hoverIndicatorPosition === 'bottom/right' ? 'right-0 translate-y-1/2 translate-x-full' : 'left-0  -translate-y-1/2 -translate-x-full'
+                : hoverIndicatorPosition === 'bottom/right' ? 'bottom-0  translate-y-full -translate-x-1/2' : 'top-0  -translate-y-full -translate-x-1/2',
+        ) }
+            style={
+                isVertical
+                    ? {
+                        bottom: `${valueHover * 100}%`
+                    }
+                    : {
+                        left: `${valueHover * 100}%`
+                    }
+            }
+        >
+            <div className={ clsx(
+                'indicatorArrow',
+                'absolute bg-transparent w-0 h-0  ',
+                // 'rotate-45',
+                'border-t-[6px] border-b-[6px] border-l-[6px] border-r-[6px]',
+                /**
+                 * what an amazing triangle
+                 */
+                isVertical
+                    ? hoverIndicatorPosition === 'bottom/right'
+                        ? 'left-0 top-1/2 -translate-y-1/2 -translate-x-full border-r-slate-600/40 border-b-transparent border-l-transparent border-t-transparent'
+                        : 'right-0 top-1/2 -translate-y-1/2 translate-x-full border-l-slate-600/40 border-b-transparent border-t-transparent border-r-transparent'
+                    : hoverIndicatorPosition === 'bottom/right'
+                        ? 'top-0 left-1/2 -translate-x-1/2 -translate-y-full   border-b-slate-600/40 border-t-transparent border-l-transparent border-r-transparent'
+                        : 'bottom-0 left-1/2 -translate-x-1/2 translate-y-full border-t-slate-600/40 border-b-transparent border-l-transparent border-r-transparent'
+
+
+            ) }></div>
+            { getHoverIndicatorContent?.(valueHover) ?? valueHover.toFixed(3) }
+        </div>
     return (
         <>
             <div
                 ref={ refActionArea }
                 className={ clsx(
-                    " bor!der border-blue-600  touch-none select-none grid items-center justify-items-center group ",
+                    "Slider bor!der border-blue-600  touch-none select-none grid items-center justify-items-center group ",
                     isShowSlider && 'cursor-pointer',
                     { isAbleTouch: "" },
                     className,
@@ -631,16 +746,17 @@ export function Slider({ isShowSlider = true,
                 // onTouchEnd={ handleTouchEnd }
 
 
-                { ...(!isDisableMouse && {
-                    onPointerMove: hanldePointerEvent,
-                    onPointerDown: hanldePointerEvent,
-                    onPointerUp: hanldePointerEvent,
-                    onPointerLeave: hanldePointerEvent,
-                }) }
-            // onPointerMove={ hanldePointerEvent }
-            // onPointerDown={ hanldePointerEvent }
-            // onPointerUp={ hanldePointerEvent }
-            // onPointerLeave={ hanldePointerEvent }
+                // { ...(!isDisableMouse && {
+                //     onPointerMove: hanldePointerEvent,
+                //     onPointerDown: hanldePointerEvent,
+                //     onPointerUp: hanldePointerEvent,
+                //     onPointerLeave: hanldePointerEvent,
+                // }) }
+                onPointerMove={ hanldePointerEvent }
+                onPointerDown={ hanldePointerEvent }
+                onPointerUp={ hanldePointerEvent }
+                onPointerLeave={ hanldePointerEvent }
+                onPointerCancel={ hanldePointerEvent }
             >
                 { children }
                 {
@@ -719,9 +835,11 @@ export function Slider({ isShowSlider = true,
                                         transformOrigin: 'bottom',
                                         /**
                                          * scale need chrome>=104
+                                         * should use bottom, because translate's 50% is based on itself, rather than its parent
                                          */
                                         transform: `scale(100%, ${(valueHover - value) * 100}%)`,
                                         bottom: `${value * 100}%`,
+                                        left: 0,
                                     }
                                     : {
                                         height: `100%`,
@@ -736,6 +854,8 @@ export function Slider({ isShowSlider = true,
 
                     </div>
                 }
+                { isEnableHoverIndicator && isHovered && HoverIndicator }
+
             </div>
             {/* <DeltaIndicator
                 // isVisiable={ isShowDeltaIndicator }
@@ -804,13 +924,12 @@ export default function Test() {
                 className="absolute h-20 w#-5/6 m-2 bottom-0 left-20 right-20"
                 isVertical={ false }
                 value={ value1Hori }
-                getIndicatorContent={ (value, delta) => {
-                    return <div className="flex items-center justify-center gap-1 font-serif">
-                        { delta < 0 && svg.leftDouble }
-                        { delta.toFixed(3) }
-                        { delta > 0 && svg.rightDouble }
-                    </div>
-                } }
+                isEnableHoverIndicator
+                // getHoverIndicatorContent={ (valueHover) => {
+                //     return <div className="flex items-center justify-center gap-1 font-serif">
+                //         { valueHover }
+                //     </div>
+                // } }
                 onPointerDown={ () => {
                     // showDeltaIndicator(0, true)
                 } }
@@ -819,9 +938,12 @@ export default function Test() {
                 } }
 
                 onValueChange={ (newValue, isPointerDown: boolean, newValueDelta: number) => {
+                    // flushSync(() => {
+
+                    // })
+                    // setValue1(newValue)
                     setValue1((s) => s + newValueDelta)
                     // setValue1(value1 + newValueDelta)
-                    // setValue1(newValue)
                     showDeltaIndicator(newValueDelta, true)
                     // console.log('isPointerDown', isPointerDown)
                     // setIsSliderPointerDown(isPointerDown)
@@ -835,11 +957,11 @@ export default function Test() {
                     // }
                     console.log(
                         '[Slider: onValueChange]',
-                        isPointerDown,
-                        'newValueDelta', newValueDelta,
-                        'value1', value1Hori,
-                        'newValue', newValue,
-                        'value1 + newValueDelta', value1Hori + newValueDelta,
+                        // 'isPointerDown:',isPointerDown,
+                        'value1:', value1Hori,
+                        'newValue:', newValue,
+                        'newValueDelta:', newValueDelta,
+                        'value1 + newValueDelta:', value1Hori + newValueDelta,
                         newValue === value1Hori + newValueDelta ? '' : 'diff',
                         Math.abs(newValueDelta) > 1 ? 'bigggggg' : '',
                     )
@@ -861,6 +983,7 @@ export default function Test() {
                 className="absolute h#-5/6 w-20 m-2 left-0 bottom-10 top-10"
                 isVertical={ true }
                 value={ value2Vert }
+                isEnableHoverIndicator
                 onValueChange={ (newValue, isPointerDown: boolean, newValueDelta: number) => {
                     setValue2(newValue)
                     setIsSliderPointerDown(isPointerDown)
@@ -868,6 +991,7 @@ export default function Test() {
                     console.log(isPointerDown, newValue, newValueDelta)
                 } }
                 isShowDebugInfo
+                hoverIndicatorPosition="bottom/right"
                 bufferedPercentRanges={ [
                     {
                         start: 0.7,
@@ -906,7 +1030,17 @@ export default function Test() {
             </DeltaIndicator> */}
 
             { DeltaIndicator }
-
+            <button className={ clsx(
+                'ml-32',
+            ) }
+                onClick={ () => {
+                    if (document.fullscreenElement) {
+                        document.exitFullscreen()
+                    } else {
+                        document.documentElement.requestFullscreen()
+                    }
+                } }
+            >Toggle Fullscreen</button>
 
         </div >
     )
@@ -965,6 +1099,19 @@ function SliderDebugger({ /* isAbleTouch, */ refActionArea }: {
         <>
             <div className="#sm:grid grid grid-cols-2 text-xs sm:text-sm font-mono mb-12 border border-blue-300/30">
                 <div>
+                    <div className="text-purple-400 font-bold"> --Pointer-- </div>
+                    <div><div className="inline-block w-28">{ "type:" } </div> 			<ChangeVisibleString string={ infoPointer?.type } /></div>
+                    <div><div className="inline-block w-28">{ "pointerType:" } </div> 	<ChangeVisibleString string={ infoPointer?.pointerType } /></div>
+                    <div><div className="inline-block w-28">{ "pointerId:" } </div> 	<ChangeVisibleString string={ infoPointer?.pointerId } /></div>
+                    <div><div className="inline-block w-28">{ "screenX:" } </div> 		<ChangeVisibleString string={ infoPointer?.screenX.toFixed(2) } />	</div>
+                    <div><div className="inline-block w-28">{ "screenY:" } </div> 		<ChangeVisibleString string={ infoPointer?.screenY.toFixed(2) } /></div>
+                    <div><div className="inline-block w-28">{ "clientX:" } </div> 		<ChangeVisibleString string={ infoPointer?.clientX.toFixed(2) } /></div>
+                    <div><div className="inline-block w-28">{ "clientY:" } </div> 		<ChangeVisibleString string={ infoPointer?.clientY.toFixed(2) } /></div>
+                    <div><div className="inline-block w-28">{ "movementX:" } </div> 	<ChangeVisibleString string={ infoPointer?.movementX.toFixed(2) } /></div>
+                    <div><div className="inline-block w-28">{ "movementY:" } </div> 	<ChangeVisibleString string={ infoPointer?.movementY.toFixed(2) } /></div>
+                    <div><div className="inline-block w-28">{ "buttons:" } </div> 		<ChangeVisibleString string={ infoPointer?.buttons } /></div>
+                </div>
+                <div>
                     <div className="text-purple-400 font-bold"> --Touch-- </div>
                     <div><div className="inline-block w-28">{ "type:" } </div> 			<ChangeVisibleString string={ touchType } /></div>
                     {
@@ -982,19 +1129,6 @@ function SliderDebugger({ /* isAbleTouch, */ refActionArea }: {
                             </Fragment>
                         )
                     }
-                </div>
-                <div>
-                    <div className="text-purple-400 font-bold"> --Pointer-- </div>
-                    <div><div className="inline-block w-28">{ "type:" } </div> 			<ChangeVisibleString string={ infoPointer?.type } /></div>
-                    <div><div className="inline-block w-28">{ "pointerType:" } </div> 	<ChangeVisibleString string={ infoPointer?.pointerType } /></div>
-                    <div><div className="inline-block w-28">{ "pointerId:" } </div> 	<ChangeVisibleString string={ infoPointer?.pointerId } /></div>
-                    <div><div className="inline-block w-28">{ "screenX:" } </div> 		<ChangeVisibleString string={ infoPointer?.screenX.toFixed(2) } />	</div>
-                    <div><div className="inline-block w-28">{ "screenY:" } </div> 		<ChangeVisibleString string={ infoPointer?.screenY.toFixed(2) } /></div>
-                    <div><div className="inline-block w-28">{ "clientX:" } </div> 		<ChangeVisibleString string={ infoPointer?.clientX.toFixed(2) } /></div>
-                    <div><div className="inline-block w-28">{ "clientY:" } </div> 		<ChangeVisibleString string={ infoPointer?.clientY.toFixed(2) } /></div>
-                    <div><div className="inline-block w-28">{ "movementX:" } </div> 	<ChangeVisibleString string={ infoPointer?.movementX.toFixed(2) } /></div>
-                    <div><div className="inline-block w-28">{ "movementY:" } </div> 	<ChangeVisibleString string={ infoPointer?.movementY.toFixed(2) } /></div>
-                    <div><div className="inline-block w-28">{ "buttons:" } </div> 		<ChangeVisibleString string={ infoPointer?.buttons } /></div>
                 </div>
             </div>
             {/* <div className="font-bold text-orange-300">Mode: { isAbleTouch ? 'Touch' : 'Mouse' }</div> */ }
@@ -1017,30 +1151,30 @@ function ChangeVisibleChar({ char }: { char: string }) {
     const refAnimation = useRef<Animation | undefined>(undefined)
     const refElem = useRef<HTMLSpanElement>(null)
     useEffect(() => {
-        // if (char !== refPrevChar.current) {
-        //     if (refAnimation.current) {
-        //         refAnimation.current?.cancel()
-        //         refAnimation.current?.play()
+        if (char !== refPrevChar.current) {
+            if (refAnimation.current) {
+                refAnimation.current?.cancel()
+                refAnimation.current?.play()
 
-        //     } else {
+            } else {
 
-        //         refAnimation.current = refElem.current?.animate(
-        //             [
-        //                 {
-        //                     backgroundColor: 'DarkGoldenRod'
-        //                 },
-        //                 {
-        //                     backgroundColor: 'transparent'
-        //                 },
-        //             ],
-        //             {
-        //                 fill: "both",
-        //                 duration: 300,
+                refAnimation.current = refElem.current?.animate(
+                    [
+                        {
+                            backgroundColor: 'DarkGoldenRod'
+                        },
+                        {
+                            backgroundColor: 'transparent'
+                        },
+                    ],
+                    {
+                        fill: "both",
+                        duration: 300,
 
-        //             }
-        //         )
-        //     }
-        // }
+                    }
+                )
+            }
+        }
         refPrevChar.current = char
     }, [char])
     return (

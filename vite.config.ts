@@ -11,8 +11,8 @@ export default defineConfig({
         // million.vite({ auto: true }), 
 		reactSwc({
             plugins: [
-                ["@swc-jotai/react-refresh", {}],
-                ["@swc-jotai/debug-label", {}],
+                // ["@swc-jotai/react-refresh", {}],
+                // ["@swc-jotai/debug-label", {}],
             ]
         }),
         // glslify(),

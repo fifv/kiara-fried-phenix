@@ -55,16 +55,20 @@ const appTitlesAndComponents: [string, PreloadableComponent<() => JSX.Element>][
     ['20-use-gesture', lazyWithPreload(() => import('./try20-use-gesture')),],
     ['21-react-three-fiber', lazyWithPreload(() => import('./try21-react-three-fiber')),],
     ['22-jotai-family', lazyWithPreload(() => import('./try22-jotai-family')),],
-    ['23-jotai-query', lazyWithPreload(() => import('./try23-jotai-query')),],
+    // ['23-jotai-query', lazyWithPreload(() => import('./try23-jotai-query')),],
     ['24-jotai-more', lazyWithPreload(() => import('./try24-jotai-more')),],
     ['25-debug-backdrop', lazyWithPreload(() => import('./try25-debug-backdrop')),],
     ['26-virtualize-and-scrollbar', lazyWithPreload(() => import('./try26-virtualize-and-scrollbar')),],
+    ['27-image', lazyWithPreload(() => import('./try27-image.tsx')),],
+    ['28-ebml', lazyWithPreload(() => import('./try28-ebml.tsx')),],
     ['calc', lazyWithPreload(() => import('./tools/minecraft-exp-calculator')),],
     ['qbit-batch-mv', lazyWithPreload(() => import('./tools/qbit-batch-mv')),],
     ['checkout-calculator', lazyWithPreload(() => import('./tools/checkout-calculator')),],
     ['Slider', lazyWithPreload(() => import('./components/Slider')),],
     ['vanilla-01-css-absoluteincss', lazyWithPreload(() => import('./try-vanilla/try01-css-absoluteincss')),],
     ['vanilla-02-css-3dtransform', lazyWithPreload(() => import('./try-vanilla/try02-css-3dtransform')),],
+    ['vanilla-03-draggable', lazyWithPreload(() => import('./try-vanilla/try03-draggable.tsx')),],
+    ['vanilla-04-css-blend', lazyWithPreload(() => import('./try-vanilla/try04-css-blend.tsx')),],
 ]
 // const Apps = appTitlesAndComponents.map((appPath) =>
 //     lazyWithPreload(() => import(`./try${appPath}.tsx`))
@@ -113,7 +117,7 @@ export default function App() {
                 'navigationPanel',
                 'z-[99999] mr-1 p-1  fixed right-0 top-10 max-h-[calc(100vh_-_52px)] overflow-y-auto',
                 'outline outline-white/30 outline-1 bg-black/30 rounded',
-                'select-none font-bold font-mono'
+                'select-none font-bold font-mono',
             ) } ref={ refNavigationPanel }>
                 { appTitlesAndComponents.map((appTitleAndComponent, i) => <div
                     key={ i }
@@ -147,7 +151,7 @@ export default function App() {
                 <Suspense fallback={
                     <div className="rounded bg-green-600 p-4 fixed left-1/4 top-1/2 -translate-x-1/2 -translate-y-1/2 font-bold flex justify-center items-center">
                         <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         Lazy Loading Components...

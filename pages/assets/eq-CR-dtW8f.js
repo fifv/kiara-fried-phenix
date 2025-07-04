@@ -1,0 +1,1 @@
+import{_baseGetTag_default as e,isObject_default as t}from"./isObject-9FbGQutX.js";var n=`[object AsyncFunction]`,r=`[object Function]`,i=`[object GeneratorFunction]`,a=`[object Proxy]`;function o(o){if(!t(o))return!1;var s=e(o);return s==r||s==i||s==n||s==a}var s=o;function c(e,t){return e===t||e!==e&&t!==t}var l=c;export{l as eq_default,s as isFunction_default};

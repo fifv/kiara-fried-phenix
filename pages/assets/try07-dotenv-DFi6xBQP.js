@@ -1,0 +1,1 @@
+import{__toESM as e,require_jsx_runtime as t,require_react as n}from"./index-BfF3hZ2k.js";var r=e(n()),i=e(t());function a(){let[e,t]=(0,r.useState)(0);return(0,i.jsxs)(`div`,{children:[`123`,JSON.parse(`0`)?`this is true`:`this is false`]})}export{a as default};

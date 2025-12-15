@@ -1,6 +1,8 @@
 import { atom, useAtom } from "jotai"
 import { useState } from "react"
 import { DevTools as JotaiDevTools } from 'jotai-devtools'
+import jotaiDevToolsCss from 'jotai-devtools/styles.css?inline'
+
 const anAtom = atom(0)
 anAtom.onMount = (setAtom) => {
     /**
@@ -55,6 +57,7 @@ export default function App() {
                 isActive &&
                 <TryAtom></TryAtom>
             }
+            <style>{ jotaiDevToolsCss }</style>
             <JotaiDevTools theme="dark"></JotaiDevTools>
         </div>
     )

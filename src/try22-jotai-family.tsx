@@ -4,6 +4,8 @@ import { atomFamily, selectAtom } from 'jotai/utils'
 import { atom, useAtom, useSetAtom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
 import { DevTools as JotaiDevTools } from 'jotai-devtools'
+import jotaiDevToolsCss from 'jotai-devtools/styles.css?inline'
+
 import clsx from "clsx"
 const currentIdAtom = atom(13)
 const idFamily = atomFamily(
@@ -24,18 +26,18 @@ const isCurrentFamily = atomFamily(
 const aAtom = atom(true)
 const bAtom = atom(
     (get) => {
-        return typeof get(aAtom)
+        return get(aAtom)
     }
 )
 const cAtom = atom(
     (get) => {
-        return { status: typeof get(aAtom) }
+        return { status: get(aAtom) }
     }
 )
 const dAtom = selectAtom(
     aAtom,
     (a) => {
-        return { status: typeof a }
+        return { status: a }
     },
     (a, b) => {
         return JSON.stringify(a) === JSON.stringify(b)
@@ -48,11 +50,11 @@ const dAtom = selectAtom(
 const eAtom = atom(
     (get) => {
         // get(aAtom)
-        console.time('loooong operation');
+        console.time('loooong operation')
         for (let i = 0; i < 1000000000; i++) {
             const aaaa = 111 ** 23
         }
-        console.timeEnd('loooong operation');
+        console.timeEnd('loooong operation')
         return 'oh yeah!'
     }
 )
@@ -68,7 +70,7 @@ function TestJotaiControl() {
             onClick={ () => {
                 setA((x) => (!x))
             } }
-        >{ a ? 'true' : 'false' }</div>
+        >a: { JSON.stringify(a) }</div>
     )
 }
 function TestJotaiPrimitive() {
@@ -77,7 +79,7 @@ function TestJotaiPrimitive() {
     return (
         <div className={ clsx(
         ) }
-        >{ b }</div>
+        >b: { JSON.stringify(b) }</div>
     )
 }
 function TestJotaiObject() {
@@ -86,7 +88,7 @@ function TestJotaiObject() {
     return (
         <div className={ clsx(
         ) }
-        >{ c.status.toString() }</div>
+        >c: { JSON.stringify(c) }</div>
     )
 }
 function TestJotaiSelect() {
@@ -98,7 +100,7 @@ function TestJotaiSelect() {
             onClick={ () => {
                 // setD()
             } }
-        >{ JSON.stringify(d) }</div>
+        >d: { JSON.stringify(d) }</div>
     )
 }
 function TestJotaiMemo() {
@@ -121,7 +123,7 @@ function TestJotai() {
         <TestJotaiPrimitive></TestJotaiPrimitive>
         <TestJotaiObject></TestJotaiObject>
         <TestJotaiSelect></TestJotaiSelect>
-        {/* <TestJotaiMemo></TestJotaiMemo> */}
+        {/* <TestJotaiMemo></TestJotaiMemo> */ }
     </>
 }
 export default function App() {
@@ -138,7 +140,15 @@ export default function App() {
                     )
                 }
             </div>
-            <JotaiDevTools></JotaiDevTools>
+            {
+                process.env.NODE_ENV !== 'production' ? (
+                    <>
+                        <style>{ jotaiDevToolsCss }</style>
+                        <JotaiDevTools></JotaiDevTools>
+                    </>
+                ) : null
+            }
+
         </>
     )
 }

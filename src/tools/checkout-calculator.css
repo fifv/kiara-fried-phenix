@@ -1,0 +1,10 @@
+/* @import "tailwindcss"; */
+/* @plugin "daisyui"; */
+
+/**
+ * what's this? added by tailwind v4?
+ */
+#CheckoutCalculator button {
+    padding: unset;
+    margin: unset;
+}

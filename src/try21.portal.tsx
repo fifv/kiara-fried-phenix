@@ -1,10 +1,10 @@
 import * as THREE from 'three'
 import React, { Suspense, useEffect, useRef, useState } from 'react'
-import { Canvas, useFrame, ThreeElements, useThree, extend, GroupProps, useLoader, Object3DNode, MaterialNode, } from '@react-three/fiber'
+import { Canvas, useFrame, type ThreeElements, useThree, extend, type GroupProps, useLoader, type Object3DNode, type MaterialNode, } from '@react-three/fiber'
 import { Center, FlyControls, OrbitControls, PointerLockControls, Sparkles, Text3D, shaderMaterial, useGLTF, useTexture } from '@react-three/drei'
 import clsx from 'clsx'
 // import glsl from 'glslify'
-import { GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { type GLTF, GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 
 
 type PortalMaterial = THREE.ShaderMaterial & {
@@ -151,9 +151,9 @@ type GLTFResult = GLTF & {
 }
 export function PortalModel(props: GroupProps) {
     const refPortalMaterial = useRef<PortalMaterial>(null)
-    const bakedTexture = useTexture('/baked-02.jpeg')
+    const bakedTexture = useTexture('baked-02.jpeg')
     // const { nodes } = useLoader(GLTFLoader, '/portal-2.glb')
-    const { nodes } = useGLTF('/portal-2.glb') as GLTFResult
+    const { nodes } = useGLTF('portal-2.glb') as GLTFResult
     useFrame((state, delta) => (refPortalMaterial.current!.uTime += delta))
     return (
         <group { ...props } dispose={ null } rotation={ [0, 1 * Math.PI, 0] } position={ [0, 0.1, 0] }>
@@ -179,8 +179,21 @@ declare module '@react-three/fiber' {
 extend({ PortalMaterial })
 
 
-
-
+/**
+ * 2025.05.31:
+ * fix for `Property 'mesh' does not exist on type 'JSX.IntrinsicElements'.`
+ * from https://github.com/pmndrs/react-three-fiber/issues/3385#issuecomment-2446045646
+ * 
+ * or use @react-three/fiber@rc 
+ */
+// declare global {
+//     namespace React {
+//         namespace JSX {
+//             interface IntrinsicElements extends ThreeElements {
+//             }
+//         }
+//     }
+// }
 
 
 

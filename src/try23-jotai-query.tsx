@@ -1,5 +1,5 @@
 import { isEqual, range } from "lodash-es"
-import { ReactNode, useEffect, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { atomFamily, selectAtom, useHydrateAtoms } from 'jotai/utils'
 import { Provider, atom, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
@@ -7,8 +7,9 @@ import { DevTools as JotaiDevTools } from 'jotai-devtools'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import clsx from "clsx"
+import jotaiDevToolsCss from 'jotai-devtools/styles.css?inline'
 
-import { atomsWithQuery, queryClientAtom } from 'jotai-tanstack-query'
+import { atomWithQuery, queryClientAtom } from 'jotai-tanstack-query'
 // import { atomsWithQuery, queryClientAtom } from './try23.atomWithQuery'
 import {
     QueryClient,
@@ -20,7 +21,7 @@ const myStore = createStore()
  * ReactQueryDevtools 5.0.0-beta.29 crash, 28ok
  */
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
-import { atomWithQuery } from "./try23.myAtomWithQuery"
+// import { atomWithQuery } from "./try23.myAtomWithQuery"
 // import { PersistQueryClientProvider } from "./try23.PersistQueryClientProvider"
 const queryClient = new QueryClient()
 const persister = createSyncStoragePersister({
@@ -34,7 +35,7 @@ interface Todo {
     title: string
     completed: boolean
 }
-const [, todosQueryAtom] = atomsWithQuery<Todo[]>((get) => ({
+const todosQueryAtom = atomWithQuery<Todo[]>((get) => ({
     queryKey: ['todos',],
     queryFn: async ({ queryKey: [, id] }) => {
         console.log('fetch https://jsonplaceholder.typicode.com/todos/')
@@ -47,7 +48,7 @@ todosQueryAtom.debugLabel = 'todosQueryAtom'
 
 
 const messageAtom = atom('Edit me and see output in console')
-const [, jotaiQueryAtom] = atomsWithQuery<string>((get) => ({
+const jotaiQueryAtom = atomWithQuery<string>((get) => ({
     queryKey: ['jotai', get(messageAtom)],
     queryFn: async ({ queryKey: [, message] }) => {
         // console.log('queryFn jotai')
@@ -126,7 +127,7 @@ const queryResultAtom = atomWithQuery((get) => {
             })
         },
     }
-}, queryClient)
+}, () => queryClient)
 queryResultAtom.debugLabel = 'queryResultAtom'
 // console.log('queryResultAtom', queryResultAtom)
 
@@ -173,10 +174,24 @@ function Editor() {
     const [message, setMessage] = useAtom(messageAtom)
 
     return (
-        <input className={ clsx(
-            message.length >= 37 && ' focus-visible:border-red-500 focus-visible:outline outline-red-500',
-        ) } type='text' id='value' value={ message } autoComplete="off" style={ { width: '80vw', height: '32px' } } onChange={ (e) => { console.log('* message changed'); setMessage(e.currentTarget.value) } } />
+        <div className={ clsx(
+            'm-2',
+        ) }>
 
+            <input
+                className={ clsx(
+                    message.length >= 37 && ' focus-visible:border-red-500 focus-visible:outline outline-red-500',
+                    'w-80 rounded-md p-2 text-sm caret-pink-500 ring-1 ring-gray-900/10 focus:ring-2 focus:ring-pink-500 focus:outline-none ',
+                    'dark:bg-gray-950/25 dark:ring-1 dark:ring-white/5 dark:focus:bg-gray-950/10 dark:focus:ring-2 dark:focus:ring-pink-500',
+                ) }
+                type='text' id='value'
+                value={ message }
+                autoComplete="off"
+                style={ { width: '80vw', height: '32px' } }
+                onChange={ (e) => { console.log('* message changed'); setMessage(e.currentTarget.value) } }
+            />
+
+        </div>
     )
 }
 
@@ -205,12 +220,19 @@ export default function App() {
                     {/* <TryMyQuery></TryMyQuery> */ }
                     {
                         isActive && <>
-                            {/* <TryQuery></TryQuery> */}
+                            {/* <TryQuery></TryQuery> */ }
                             <TryMyQuery></TryMyQuery>
                             <TryReRender></TryReRender>
                         </>
                     }
-                    <JotaiDevTools theme="dark"></JotaiDevTools>
+                    {
+                        process.env.NODE_ENV !== 'production' ? (
+                            <>
+                                <style>{ jotaiDevToolsCss }</style>
+                                <JotaiDevTools theme="dark"></JotaiDevTools>
+                            </>
+                        ) : null
+                    }
                 </HydrateAtoms>
             </Provider>
             <ReactQueryDevtools initialIsOpen={ false } client={ queryClient } />

@@ -1,6 +1,6 @@
 import { Component, useEffect, useRef, useState } from "react"
 import type { } from 'react/experimental'
-import { experimental_useEffectEvent as useEffectEvent } from 'react';
+import { useEffectEvent } from 'react';
 import chalk from "chalk";
 import log from "loglevel";
 
@@ -457,13 +457,13 @@ function Some2() {
 	const [count, setCount] = useState(0)
 
 	// const ttt = useOnlineStatus()
-	function tt(argumefntsf) {
-		// bodyasfd
-		asf
-		asdfasg
-		gasease
-		asff
-	}
+	// function tt(argumefntsf) {
+	// 	// bodyasfd
+	// 	asf
+	// 	asdfasg
+	// 	gasease
+	// 	asff
+	// }
 	return (
 		<div>some2{ require('./some-cjs.js') }</div>
 	)

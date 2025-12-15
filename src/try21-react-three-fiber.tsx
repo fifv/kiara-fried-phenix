@@ -1,10 +1,10 @@
 import * as THREE from 'three'
 import React, { Suspense, useEffect, useRef, useState } from 'react'
-import { Canvas, useFrame, ThreeElements, useThree, extend, GroupProps, useLoader, Object3DNode, MaterialNode, } from '@react-three/fiber'
+import { Canvas, useFrame, type ThreeElements, useThree, extend, type GroupProps, useLoader, type Object3DNode, type MaterialNode, } from '@react-three/fiber'
 import { Center, FlyControls, OrbitControls, PointerLockControls, Sparkles, Text3D, shaderMaterial, useGLTF, useTexture } from '@react-three/drei'
 import clsx from 'clsx'
 // import glsl from 'glslify'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+// import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { PortalModel } from './try21.portal'
 
 function Box(props: ThreeElements['mesh']) {
@@ -57,7 +57,7 @@ function Loading(props: ThreeElements['mesh']) {
 function TorusKnot() {
     return (
         <mesh position={ [3, 1, 3] }>
-            <torusKnotGeometry args={[,,150,30]}></torusKnotGeometry>
+            <torusKnotGeometry args={ [, , 150, 30] }></torusKnotGeometry>
             <meshStandardMaterial wireframe color={ 0xffff00 }></meshStandardMaterial>
         </mesh>
     )
@@ -143,7 +143,7 @@ export default function App() {
                     <Box position={ [1.2, 0, 0] } />
                     {/* <directionalLight color="red" position={[0, 0, 5]} /> */ }
                     {/* <PointerLockControls></PointerLockControls> */ }
-                    <OrbitControls/>
+                    <OrbitControls />
                     {/* <FlyControls movementSpeed={4}> </FlyControls> */ }
                     <gridHelper />
                     <axesHelper />

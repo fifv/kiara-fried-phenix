@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
 
-import { Action, Location, createBrowserHistory } from "history";
+import { Action, type Location, createBrowserHistory } from "history";
 import { useImmer } from "use-immer";
-import { Immutable } from "immer";
+import { type Immutable } from "immer";
 const browserHistory = createBrowserHistory()
 interface HistoryEntry {
 	state: any,

@@ -6,7 +6,7 @@ import './index.css'
 import {
     elementScroll,
     useVirtualizer,
-    VirtualizerOptions,
+    type VirtualizerOptions,
 } from '@tanstack/react-virtual'
 
 function easeInOutQuint(t: number) {
@@ -14,7 +14,7 @@ function easeInOutQuint(t: number) {
 }
 function VirList() {
     const parentRef = useRef<HTMLDivElement | null>(null)
-    const scrollingRef = useRef<number>()
+    const scrollingRef = useRef<number>(null)
 
     const scrollToFn: VirtualizerOptions<any, any>['scrollToFn'] =
         useCallback((offset, canSmooth, instance) => {

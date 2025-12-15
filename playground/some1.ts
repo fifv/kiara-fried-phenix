@@ -1,3 +1,5 @@
-function hi(arguments) {
+function hi(a) {
 	// body
+    const aa = 
+
 }

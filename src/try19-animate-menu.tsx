@@ -8,6 +8,7 @@ export default function App() {
     const refPathTop = useRef<SVGPathElement>(null)
     const refPathMiddle = useRef<SVGPathElement>(null)
     const refPathBottom = useRef<SVGPathElement>(null)
+    
     return (
         <div>
             <div className="hamb relative aa" aria-label="Open Menu" onClick={ () => {

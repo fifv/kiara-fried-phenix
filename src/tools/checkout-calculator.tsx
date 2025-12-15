@@ -6,6 +6,8 @@ import { produce } from "immer"
 import { useLocalStorage } from "usehooks-ts"
 import { pull, uniq } from "lodash-es"
 
+import './checkout-calculator.css'
+
 interface Player {
     id: string
     name: string
@@ -42,12 +44,13 @@ export default function App() {
 
 
     return (
-        <div>
-
+        <div id="CheckoutCalculator">
             <div className={ clsx(
                 'flex items-center m-2',
             ) }>
-                <button onClick={ () => {
+                <button className={ clsx(
+                    'w-24 h-8',
+                ) } onClick={ () => {
                     setPlayers((entries) => [
                         emptyPlayerTemplateGenerator(),
                         ...entries,
@@ -61,8 +64,9 @@ export default function App() {
                             ) }>
                                 <input
                                     className={ clsx(
+                                        'input',
                                         'w-24 ',
-                                        'rounded py-1 px-2 mx-1 font-mono',
+                                        'rounded py-1 px-2 mx-1 font-mono outline outline-white/20',
                                     ) }
                                     value={ player.name }
                                     onChange={ (e) => {
@@ -72,8 +76,8 @@ export default function App() {
                                 ></input>
                                 <button
                                     className={ clsx(
-                                        'py-0 px-2 mx-2',
-                                        'absolute right-0 top-1/2 -translate-y-1/2',
+                                        'py-0 px-0 mx-0 h-6 w-6 p-0 m-12',
+                                        'absolute right-2 top-1/2 -translate-y-1/2',
                                     ) }
                                     onClick={ () => {
                                         players.splice(i, 1)
@@ -193,7 +197,7 @@ export default function App() {
                                                     : '請先選擇消費者'
                                             }
                                             onChange={ (e) => {
-                                                entry.amountPerPlayer = parseFloat(e.currentTarget.value) / consumersCount 
+                                                entry.amountPerPlayer = parseFloat(e.currentTarget.value) / consumersCount
                                                 if (isNaN(entry.amountPerPlayer)) {
                                                     entry.amountPerPlayer = 0
                                                 }

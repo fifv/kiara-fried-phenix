@@ -1,8 +1,8 @@
 import { useState } from "react"
 import c from 'chalk'
 import pc from 'picocolors'
-import cr from 'colorette'
-import lo from 'lodash-es'
+import * as cr from 'colorette'
+import * as lo from 'lodash-es'
 export default function App() {
 	const [toggle, setToggle] = useState(false)
 	return (

@@ -10,7 +10,7 @@ import { useRef } from "react"
 import { useLayoutEffect } from "react"
 
 const randomNumber = (min: number, max: number) =>
-    faker.datatype.number({ min, max })
+    faker.number.int({ min, max })
 
 const sentences = new Array(100)
     .fill(true)

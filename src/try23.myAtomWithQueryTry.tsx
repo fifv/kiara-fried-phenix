@@ -1,5 +1,5 @@
-import { DefaultError, QueryClient, QueryKey, QueryObserver, QueryObserverOptions, QueryObserverResult, notifyManager } from "@tanstack/query-core"
-import { Getter, atom, getDefaultStore, } from "jotai"
+import { type DefaultError, QueryClient, type QueryKey, QueryObserver, type QueryObserverOptions, type QueryObserverResult, notifyManager } from "@tanstack/query-core"
+import { type Getter, atom, getDefaultStore, } from "jotai"
 const defaultStore = getDefaultStore()
 // @ts-ignore
 window.defaultStore = defaultStore
